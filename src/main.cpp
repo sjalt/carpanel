@@ -7,7 +7,7 @@
 
 namespace {
 
-CRGB leds[carpanel::kLedCount];
+CRGB leds[carpanel::kMaxLedCount];
 carpanel::SceneManager scene_manager;
 carpanel::WebServerController web_server(scene_manager);
 
@@ -49,11 +49,13 @@ void setup() {
 
   pinMode(carpanel::kButtonPin, INPUT_PULLUP);
 
-  FastLED.addLeds<WS2812B, carpanel::kLedPin, GRB>(leds, carpanel::kLedCount);
+  CLEDController& led_controller =
+      FastLED.addLeds<WS2812B, carpanel::kLedPin, GRB>(
+          leds, carpanel::kDefaultLedCount);
   FastLED.setBrightness(carpanel::kDefaultBrightness);
   FastLED.clear(true);
 
-  scene_manager.begin(leds, carpanel::kLedCount);
+  scene_manager.begin(leds, carpanel::kDefaultLedCount, &led_controller);
   scene_manager.setBrightness(carpanel::kDefaultBrightness);
 
   setupWifi();

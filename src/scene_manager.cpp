@@ -9,13 +9,18 @@ SceneManager::SceneManager() {
   current_scene_.brightness = 128;
   current_scene_.speed = 32;
   current_scene_.color = CRGB::Blue;
-  layout_.rows = kDefaultPanelRows;
-  layout_.columns = kDefaultPanelColumns;
+  layout_.panel_rows = kDefaultPanelRows;
+  layout_.panel_columns = kDefaultPanelColumns;
+  layout_.panel_count = 1;
+  layout_.chain_direction = ChainDirection::Horizontal;
+  layout_.wiring = WiringMode::RowsSerpentine;
 }
 
-void SceneManager::begin(CRGB* leds, uint16_t led_count) {
+void SceneManager::begin(CRGB* leds, uint16_t led_count,
+                         CLEDController* controller) {
   leds_ = leds;
   led_count_ = led_count;
+  controller_ = controller;
   last_update_ms_ = millis();
   clearLeds();
 }
@@ -25,14 +30,29 @@ void SceneManager::setBrightness(uint8_t brightness) {
   FastLED.setBrightness(brightness);
 }
 
-bool SceneManager::setLayout(uint16_t rows, uint16_t columns) {
-  if (rows == 0 || columns == 0 ||
-      static_cast<uint32_t>(rows) * columns != led_count_) {
+bool SceneManager::setLayout(uint16_t panel_rows, uint16_t panel_columns,
+                             uint8_t panel_count,
+                             ChainDirection chain_direction,
+                             WiringMode wiring) {
+  if (panel_rows == 0 || panel_columns == 0 || panel_count == 0) {
     return false;
   }
 
-  layout_.rows = rows;
-  layout_.columns = columns;
+  PanelLayout next_layout;
+  next_layout.panel_rows = panel_rows;
+  next_layout.panel_columns = panel_columns;
+  next_layout.panel_count = panel_count;
+  next_layout.chain_direction = chain_direction;
+  next_layout.wiring = wiring;
+  const uint32_t led_count = static_cast<uint32_t>(next_layout.rows()) *
+                             next_layout.columns();
+  if (led_count == 0 || led_count > kMaxLedCount) {
+    return false;
+  }
+
+  layout_ = next_layout;
+  led_count_ = led_count;
+  controller_->setLeds(leds_, led_count_);
   return true;
 }
 
@@ -125,11 +145,13 @@ void SceneManager::renderRainbow(uint32_t now_ms) {
     return;
   }
 
-  for (uint16_t i = 0; i < led_count_; ++i) {
-    const uint16_t row = i / layout_.columns;
-    const uint16_t column = i % layout_.columns;
-    const uint16_t position = row * 256 / layout_.rows + column * 128 / layout_.columns;
-    leds_[i] = CHSV(position + (now_ms / 20), 255, 255);
+  for (uint16_t row = 0; row < layout_.rows(); ++row) {
+    for (uint16_t column = 0; column < layout_.columns(); ++column) {
+      const uint16_t i = indexForPosition(row, column);
+      const uint16_t position = row * 256 / layout_.rows() +
+                                column * 128 / layout_.columns();
+      leds_[i] = CHSV(position + (now_ms / 20), 255, 255);
+    }
   }
 
   last_update_ms_ = now_ms;
@@ -143,10 +165,11 @@ void SceneManager::renderChase(uint32_t now_ms) {
 
   clearLeds();
   const uint8_t offset = chase_offset_++;
-  for (uint16_t i = 0; i < led_count_; ++i) {
-    const uint16_t column = i % layout_.columns;
-    if ((column + offset) % 8 == 0) {
-      leds_[i] = current_scene_.color;
+  for (uint16_t row = 0; row < layout_.rows(); ++row) {
+    for (uint16_t column = 0; column < layout_.columns(); ++column) {
+      if ((column + offset) % 8 == 0) {
+        leds_[indexForPosition(row, column)] = current_scene_.color;
+      }
     }
   }
 
@@ -172,6 +195,25 @@ void SceneManager::renderSolid() {
   for (uint16_t i = 0; i < led_count_; ++i) {
     leds_[i] = current_scene_.color;
   }
+}
+
+uint16_t SceneManager::indexForPosition(uint16_t row, uint16_t column) const {
+  const bool column_wiring = layout_.wiring == WiringMode::Columns ||
+                             layout_.wiring == WiringMode::ColumnsSerpentine;
+  const bool serpentine = layout_.wiring == WiringMode::RowsSerpentine ||
+                          layout_.wiring == WiringMode::ColumnsSerpentine;
+
+  if (column_wiring) {
+    if (serpentine && column % 2 == 1) {
+      return column * layout_.rows() + (layout_.rows() - row - 1);
+    }
+    return column * layout_.rows() + row;
+  }
+
+  if (serpentine && row % 2 == 1) {
+    return row * layout_.columns() + (layout_.columns() - column - 1);
+  }
+  return row * layout_.columns() + column;
 }
 
 void SceneManager::clearLeds() {

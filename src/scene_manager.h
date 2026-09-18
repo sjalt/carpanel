@@ -15,6 +15,18 @@ enum class SceneType : uint8_t {
   Solid
 };
 
+enum class WiringMode : uint8_t {
+  Rows,
+  RowsSerpentine,
+  Columns,
+  ColumnsSerpentine
+};
+
+enum class ChainDirection : uint8_t {
+  Horizontal,
+  Vertical
+};
+
 struct SceneState {
   SceneType type = SceneType::Test;
   uint8_t brightness = 128;
@@ -23,17 +35,34 @@ struct SceneState {
 };
 
 struct PanelLayout {
-  uint16_t rows = 12;
-  uint16_t columns = 12;
+  uint16_t panel_rows = 8;
+  uint16_t panel_columns = 32;
+  uint8_t panel_count = 1;
+  ChainDirection chain_direction = ChainDirection::Horizontal;
+  WiringMode wiring = WiringMode::RowsSerpentine;
+
+  uint16_t rows() const {
+    return chain_direction == ChainDirection::Vertical
+               ? panel_rows * panel_count
+               : panel_rows;
+  }
+
+  uint16_t columns() const {
+    return chain_direction == ChainDirection::Horizontal
+               ? panel_columns * panel_count
+               : panel_columns;
+  }
 };
 
 class SceneManager {
  public:
   SceneManager();
 
-  void begin(CRGB* leds, uint16_t led_count);
+  void begin(CRGB* leds, uint16_t led_count, CLEDController* controller);
   void setBrightness(uint8_t brightness);
-  bool setLayout(uint16_t rows, uint16_t columns);
+  bool setLayout(uint16_t panel_rows, uint16_t panel_columns,
+                 uint8_t panel_count, ChainDirection chain_direction,
+                 WiringMode wiring);
   void nextScene();
   void setScene(SceneType scene);
   void update(uint32_t now_ms);
@@ -47,9 +76,11 @@ class SceneManager {
   void renderChase(uint32_t now_ms);
   void renderPulse(uint32_t now_ms);
   void renderSolid();
+  uint16_t indexForPosition(uint16_t row, uint16_t column) const;
   void clearLeds();
 
   CRGB* leds_ = nullptr;
+  CLEDController* controller_ = nullptr;
   uint16_t led_count_ = 0;
   SceneState current_scene_;
   PanelLayout layout_;
