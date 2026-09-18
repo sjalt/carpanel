@@ -25,6 +25,9 @@ pio run
 pio run --target upload
 ```
 
+5. Connect your phone or computer to the `CarPanel` Wi-Fi network using the password `carpanel123`. If your device warns that the network has no internet access, stay connected.
+6. Open a browser and navigate to [http://192.168.4.1](http://192.168.4.1) to open the control webpage. The assigned AP IP is also printed to the serial monitor at 115200 baud during startup.
+
 ## Hardware notes
 - LED data pin is configured in `src/config.h` and should be checked against the actual XIAO ESP32-S3 layout and wiring.
 - The default AP SSID is `CarPanel` with password `carpanel123`.
