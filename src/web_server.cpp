@@ -186,10 +186,10 @@ String WebServerController::buildHtml() const {
       <label for="brightness">Brightness</label>
       <input id="brightness" type="range" min="0" max="255" step="1" value="128" />
 
-      <label for="panelRows">Panel height (LEDs)</label>
+      <label for="panelRows">LED rows per panel</label>
       <input id="panelRows" type="number" min="1" value="8" />
 
-      <label for="panelColumns">Panel width (LEDs)</label>
+      <label for="panelColumns">LED columns per panel</label>
       <input id="panelColumns" type="number" min="1" value="32" />
 
       <label for="panelCount">Panels connected together</label>
@@ -201,10 +201,10 @@ String WebServerController::buildHtml() const {
         <option value="vertical">Stacked vertically</option>
       </select>
 
-      <label for="rows">Total layout rows</label>
+      <label for="rows">Combined rows (calculated)</label>
       <input id="rows" type="number" value="8" disabled />
 
-      <label for="columns">Total layout columns</label>
+      <label for="columns">Combined columns (calculated)</label>
       <input id="columns" type="number" value="32" disabled />
       <input id="rows" type="number" min="1" value="8" />
 
