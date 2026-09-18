@@ -12,7 +12,8 @@ enum class SceneType : uint8_t {
   Rainbow,
   Chase,
   Pulse,
-  Solid
+  Solid,
+  Text
 };
 
 enum class WiringMode : uint8_t {
@@ -60,6 +61,7 @@ class SceneManager {
 
   void begin(CRGB* leds, uint16_t led_count, CLEDController* controller);
   void setBrightness(uint8_t brightness);
+  void setText(const String& text);
   bool setLayout(uint16_t panel_rows, uint16_t panel_columns,
                  uint8_t panel_count, ChainDirection chain_direction,
                  WiringMode wiring);
@@ -69,6 +71,7 @@ class SceneManager {
 
   const SceneState& currentScene() const { return current_scene_; }
   const PanelLayout& layout() const { return layout_; }
+  const String& text() const { return text_; }
 
  private:
   void renderTest(uint32_t now_ms);
@@ -76,6 +79,7 @@ class SceneManager {
   void renderChase(uint32_t now_ms);
   void renderPulse(uint32_t now_ms);
   void renderSolid();
+  void renderText(uint32_t now_ms);
   uint16_t indexForPosition(uint16_t row, uint16_t column) const;
   void clearLeds();
 
@@ -88,6 +92,8 @@ class SceneManager {
   uint16_t test_led_index_ = 0;
   uint8_t chase_offset_ = 0;
   uint8_t pulse_phase_ = 0;
+  String text_ = "CarPanel";
+  uint16_t text_offset_ = 0;
 };
 
 }  // namespace carpanel

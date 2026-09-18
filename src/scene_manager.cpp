@@ -2,6 +2,44 @@
 
 #include "config.h"
 
+namespace {
+
+const uint8_t kFont[][5] = {
+    {0x7e, 0x11, 0x11, 0x11, 0x7e}, {0x7f, 0x49, 0x49, 0x49, 0x36},
+    {0x3e, 0x41, 0x41, 0x41, 0x22}, {0x7f, 0x41, 0x41, 0x22, 0x1c},
+    {0x7f, 0x49, 0x49, 0x49, 0x41}, {0x7f, 0x09, 0x09, 0x09, 0x01},
+    {0x3e, 0x41, 0x49, 0x49, 0x7a}, {0x7f, 0x08, 0x08, 0x08, 0x7f},
+    {0x00, 0x41, 0x7f, 0x41, 0x00}, {0x20, 0x40, 0x41, 0x3f, 0x01},
+    {0x7f, 0x08, 0x14, 0x22, 0x41}, {0x7f, 0x40, 0x40, 0x40, 0x40},
+    {0x7f, 0x02, 0x0c, 0x02, 0x7f}, {0x7f, 0x04, 0x08, 0x10, 0x7f},
+    {0x3e, 0x41, 0x41, 0x41, 0x3e}, {0x7f, 0x09, 0x09, 0x09, 0x06},
+    {0x3e, 0x41, 0x51, 0x21, 0x5e}, {0x7f, 0x09, 0x19, 0x29, 0x46},
+    {0x46, 0x49, 0x49, 0x49, 0x31}, {0x01, 0x01, 0x7f, 0x01, 0x01},
+    {0x3f, 0x40, 0x40, 0x40, 0x3f}, {0x1f, 0x20, 0x40, 0x20, 0x1f},
+    {0x7f, 0x20, 0x18, 0x20, 0x7f}, {0x63, 0x14, 0x08, 0x14, 0x63},
+    {0x07, 0x08, 0x70, 0x08, 0x07}, {0x61, 0x51, 0x49, 0x45, 0x43},
+    {0x3e, 0x51, 0x49, 0x45, 0x3e}, {0x00, 0x42, 0x7f, 0x40, 0x00},
+    {0x62, 0x51, 0x49, 0x49, 0x46}, {0x22, 0x49, 0x49, 0x49, 0x36},
+    {0x18, 0x14, 0x12, 0x7f, 0x10}, {0x2f, 0x49, 0x49, 0x49, 0x31},
+    {0x3e, 0x49, 0x49, 0x49, 0x32}, {0x01, 0x71, 0x09, 0x05, 0x03},
+    {0x36, 0x49, 0x49, 0x49, 0x36}, {0x26, 0x49, 0x49, 0x49, 0x3e},
+    {0x00, 0x00, 0x00, 0x00, 0x00}};
+
+uint8_t glyphColumn(char character, uint8_t column) {
+  if (character >= 'a' && character <= 'z') {
+    character = static_cast<char>(character - 'a' + 'A');
+  }
+  if (character >= 'A' && character <= 'Z') {
+    return kFont[character - 'A'][column];
+  }
+  if (character >= '0' && character <= '9') {
+    return kFont[26 + character - '0'][column];
+  }
+  return kFont[36][column];
+}
+
+}  // namespace
+
 namespace carpanel {
 
 SceneManager::SceneManager() {
@@ -28,6 +66,11 @@ void SceneManager::begin(CRGB* leds, uint16_t led_count,
 void SceneManager::setBrightness(uint8_t brightness) {
   current_scene_.brightness = brightness;
   FastLED.setBrightness(brightness);
+}
+
+void SceneManager::setText(const String& text) {
+  text_ = text;
+  text_offset_ = 0;
 }
 
 bool SceneManager::setLayout(uint16_t panel_rows, uint16_t panel_columns,
@@ -71,6 +114,9 @@ void SceneManager::nextScene() {
       setScene(SceneType::Solid);
       break;
     case SceneType::Solid:
+      setScene(SceneType::Text);
+      break;
+    case SceneType::Text:
     default:
       setScene(SceneType::Test);
       break;
@@ -97,6 +143,13 @@ void SceneManager::setScene(SceneType scene) {
       current_scene_.speed = 55;
       break;
     case SceneType::Solid:
+      current_scene_.color = CRGB::Purple;
+      current_scene_.speed = 10;
+      break;
+    case SceneType::Text:
+      current_scene_.color = CRGB::White;
+      current_scene_.speed = 90;
+      break;
     default:
       current_scene_.color = CRGB::Purple;
       current_scene_.speed = 10;
@@ -119,6 +172,11 @@ void SceneManager::update(uint32_t now_ms) {
       renderPulse(now_ms);
       break;
     case SceneType::Solid:
+      renderSolid();
+      break;
+    case SceneType::Text:
+      renderText(now_ms);
+      break;
     default:
       renderSolid();
       break;
@@ -195,6 +253,42 @@ void SceneManager::renderSolid() {
   for (uint16_t i = 0; i < led_count_; ++i) {
     leds_[i] = current_scene_.color;
   }
+}
+
+void SceneManager::renderText(uint32_t now_ms) {
+  const uint32_t delta = now_ms - last_update_ms_;
+  if (delta < 90U) {
+    return;
+  }
+
+  clearLeds();
+  const uint16_t text_width = text_.length() * 6;
+  const uint16_t scroll_width = layout_.columns() + text_width;
+  if (scroll_width == 0) {
+    last_update_ms_ = now_ms;
+    return;
+  }
+
+  for (uint16_t character_index = 0; character_index < text_.length();
+       ++character_index) {
+    const uint8_t character = text_[character_index];
+    for (uint8_t glyph_column = 0; glyph_column < 5; ++glyph_column) {
+      const uint8_t glyph = glyphColumn(character, glyph_column);
+      const int16_t column = static_cast<int16_t>(
+          character_index * 6 + glyph_column + layout_.columns() - text_offset_);
+      if (column < 0 || column >= layout_.columns()) {
+        continue;
+      }
+      for (uint16_t row = 0; row < layout_.rows() && row < 7; ++row) {
+        if ((glyph >> row) & 1) {
+          leds_[indexForPosition(row, column)] = current_scene_.color;
+        }
+      }
+    }
+  }
+
+  text_offset_ = (text_offset_ + 1) % scroll_width;
+  last_update_ms_ = now_ms;
 }
 
 uint16_t SceneManager::indexForPosition(uint16_t row, uint16_t column) const {

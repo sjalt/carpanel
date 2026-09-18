@@ -12,6 +12,8 @@ void WebServerController::begin() {
   server_.on("/", HTTP_GET, [this]() { serveRoot(); });
   server_.on("/scene", HTTP_POST, [this]() { handleSetScene(); });
   server_.on("/brightness", HTTP_POST, [this]() { handleSetBrightness(); });
+  server_.on("/text", HTTP_GET, [this]() { serveText(); });
+  server_.on("/text", HTTP_POST, [this]() { handleSetText(); });
   server_.on("/layout", HTTP_POST, [this]() { handleSetLayout(); });
   server_.on("/api/state", HTTP_GET, [this]() { handleJsonState(); });
   server_.begin();
@@ -23,6 +25,10 @@ void WebServerController::handleClient() {
 
 void WebServerController::serveRoot() {
   server_.send(200, "text/html", buildHtml());
+}
+
+void WebServerController::serveText() {
+  server_.send(200, "text/html", buildTextHtml());
 }
 
 void WebServerController::handleSetScene() {
@@ -50,6 +56,8 @@ void WebServerController::handleSetScene() {
     scene_manager_.setScene(SceneType::Pulse);
   } else if (scene_name == "solid") {
     scene_manager_.setScene(SceneType::Solid);
+  } else if (scene_name == "text") {
+    scene_manager_.setScene(SceneType::Text);
   }
 
   server_.send(200, "application/json", "{\"ok\":true}");
@@ -69,6 +77,30 @@ void WebServerController::handleSetBrightness() {
   }
 
   scene_manager_.setBrightness(doc["brightness"] | 128);
+  server_.send(200, "application/json", "{\"ok\":true}");
+}
+
+void WebServerController::handleSetText() {
+  if (!server_.hasArg("plain")) {
+    server_.send(400, "text/plain", "Missing JSON body");
+    return;
+  }
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, server_.arg("plain"));
+  if (err) {
+    server_.send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+
+  const String text = doc["text"] | "";
+  if (text.length() == 0 || text.length() > 80) {
+    server_.send(400, "text/plain", "Text must contain 1 to 80 characters");
+    return;
+  }
+
+  scene_manager_.setText(text);
+  scene_manager_.setScene(SceneType::Text);
   server_.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -124,6 +156,7 @@ void WebServerController::handleJsonState() {
   JsonDocument doc;
   doc["scene"] = static_cast<int>(scene.type);
   doc["brightness"] = scene.brightness;
+  doc["text"] = scene_manager_.text();
   doc["panel_rows"] = scene_manager_.layout().panel_rows;
   doc["panel_columns"] = scene_manager_.layout().panel_columns;
   doc["panel_count"] = scene_manager_.layout().panel_count;
@@ -181,6 +214,7 @@ String WebServerController::buildHtml() const {
         <option value="chase">Chase</option>
         <option value="pulse">Pulse</option>
         <option value="solid">Solid</option>
+        <option value="text">Scrolling text</option>
       </select>
 
       <label for="brightness">Brightness</label>
@@ -217,6 +251,7 @@ String WebServerController::buildHtml() const {
       </select>
 
       <button id="applyBtn" type="button">Apply</button>
+      <a href="/text">Set scrolling text</a>
       <div id="status" class="status">Loading...</div>
     </div>
 
@@ -243,7 +278,7 @@ String WebServerController::buildHtml() const {
       async function fetchState() {
         const response = await fetch('/api/state');
         const state = await response.json();
-        sceneEl.value = ['test', 'rainbow', 'chase', 'pulse', 'solid'][state.scene] || 'test';
+        sceneEl.value = ['test', 'rainbow', 'chase', 'pulse', 'solid', 'text'][state.scene] || 'test';
         brightnessEl.value = state.brightness || 128;
         panelRowsEl.value = state.panel_rows;
         panelColumnsEl.value = state.panel_columns;
@@ -291,6 +326,63 @@ String WebServerController::buildHtml() const {
       });
 
       fetchState();
+    </script>
+  </body>
+</html>
+)HTML";
+}
+
+String WebServerController::buildTextHtml() const {
+  return R"HTML(
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CarPanel Text</title>
+    <style>
+      body { font-family: Arial, sans-serif; background: #111827; color: #f9fafb; margin: 0; padding: 24px; }
+      .panel { max-width: 420px; margin: 0 auto; background: #1f2937; border-radius: 12px; padding: 20px; }
+      label { display: block; margin-top: 16px; font-weight: bold; }
+      textarea, button, a { width: 100%; box-sizing: border-box; margin-top: 8px; padding: 10px; border-radius: 8px; border: 1px solid #374151; }
+      textarea { min-height: 110px; resize: vertical; font: inherit; }
+      button { background: #22c55e; color: #04130a; font-weight: bold; cursor: pointer; }
+      a { display: block; color: #bfdbfe; text-align: center; text-decoration: none; }
+      .status { margin-top: 18px; color: #bfdbfe; }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <h1>Scrolling text</h1>
+      <label for="text">Message</label>
+      <textarea id="text" maxlength="80" placeholder="Enter a message"></textarea>
+      <button id="saveBtn" type="button">Show text</button>
+      <a href="/">Back to controls</a>
+      <div id="status" class="status">Loading...</div>
+    </div>
+
+    <script>
+      const textEl = document.getElementById('text');
+      const statusEl = document.getElementById('status');
+
+      async function loadText() {
+        const response = await fetch('/api/state');
+        const state = await response.json();
+        textEl.value = state.text || '';
+        statusEl.textContent = 'Connected';
+      }
+
+      document.getElementById('saveBtn').addEventListener('click', async () => {
+        statusEl.textContent = 'Sending...';
+        const response = await fetch('/text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: textEl.value })
+        });
+        statusEl.textContent = response.ok ? 'Text is scrolling' : await response.text();
+      });
+
+      loadText();
     </script>
   </body>
 </html>

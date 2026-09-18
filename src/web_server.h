@@ -16,11 +16,14 @@ class WebServerController {
 
  private:
   void serveRoot();
+  void serveText();
   void handleSetScene();
   void handleSetBrightness();
+  void handleSetText();
   void handleSetLayout();
   void handleJsonState();
   String buildHtml() const;
+  String buildTextHtml() const;
 
   WebServer server_{80};
   SceneManager& scene_manager_;
