@@ -31,7 +31,7 @@ void WebServerController::handleSetScene() {
   }
 
   const String body = server_.arg("plain");
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   DeserializationError err = deserializeJson(doc, body);
   if (err) {
     server_.send(400, "text/plain", "Invalid JSON");
@@ -39,7 +39,9 @@ void WebServerController::handleSetScene() {
   }
 
   const String scene_name = doc["scene"] | "rainbow";
-  if (scene_name == "rainbow") {
+  if (scene_name == "test") {
+    scene_manager_.setScene(SceneType::Test);
+  } else if (scene_name == "rainbow") {
     scene_manager_.setScene(SceneType::Rainbow);
   } else if (scene_name == "chase") {
     scene_manager_.setScene(SceneType::Chase);
@@ -58,7 +60,7 @@ void WebServerController::handleSetBrightness() {
     return;
   }
 
-  DynamicJsonDocument doc(128);
+  JsonDocument doc;
   DeserializationError err = deserializeJson(doc, server_.arg("plain"));
   if (err) {
     server_.send(400, "text/plain", "Invalid JSON");
@@ -72,7 +74,7 @@ void WebServerController::handleSetBrightness() {
 void WebServerController::handleJsonState() {
   const auto& scene = scene_manager_.currentScene();
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["scene"] = static_cast<int>(scene.type);
   doc["brightness"] = scene.brightness;
 
@@ -103,6 +105,7 @@ String WebServerController::buildHtml() const {
       <h1>CarPanel</h1>
       <label for="scene">Scene</label>
       <select id="scene">
+        <option value="test">LED Test</option>
         <option value="rainbow">Rainbow</option>
         <option value="chase">Chase</option>
         <option value="pulse">Pulse</option>
@@ -124,7 +127,7 @@ String WebServerController::buildHtml() const {
       async function fetchState() {
         const response = await fetch('/api/state');
         const state = await response.json();
-        sceneEl.value = ['rainbow', 'chase', 'pulse', 'solid'][state.scene] || 'rainbow';
+        sceneEl.value = ['test', 'rainbow', 'chase', 'pulse', 'solid'][state.scene] || 'test';
         brightnessEl.value = state.brightness || 128;
         statusEl.textContent = 'Connected';
       }

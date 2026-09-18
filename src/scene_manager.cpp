@@ -3,7 +3,7 @@
 namespace carpanel {
 
 SceneManager::SceneManager() {
-  current_scene_.type = SceneType::Rainbow;
+  current_scene_.type = SceneType::Test;
   current_scene_.brightness = 128;
   current_scene_.speed = 32;
   current_scene_.color = CRGB::Blue;
@@ -23,6 +23,9 @@ void SceneManager::setBrightness(uint8_t brightness) {
 
 void SceneManager::nextScene() {
   switch (current_scene_.type) {
+    case SceneType::Test:
+      setScene(SceneType::Rainbow);
+      break;
     case SceneType::Rainbow:
       setScene(SceneType::Chase);
       break;
@@ -34,7 +37,7 @@ void SceneManager::nextScene() {
       break;
     case SceneType::Solid:
     default:
-      setScene(SceneType::Rainbow);
+      setScene(SceneType::Test);
       break;
   }
 }
@@ -42,6 +45,10 @@ void SceneManager::nextScene() {
 void SceneManager::setScene(SceneType scene) {
   current_scene_.type = scene;
   switch (scene) {
+    case SceneType::Test:
+      current_scene_.color = CRGB::White;
+      current_scene_.speed = 80;
+      break;
     case SceneType::Rainbow:
       current_scene_.color = CRGB::Blue;
       current_scene_.speed = 24;
@@ -64,6 +71,9 @@ void SceneManager::setScene(SceneType scene) {
 
 void SceneManager::update(uint32_t now_ms) {
   switch (current_scene_.type) {
+    case SceneType::Test:
+      renderTest(now_ms);
+      break;
     case SceneType::Rainbow:
       renderRainbow(now_ms);
       break;
@@ -80,6 +90,18 @@ void SceneManager::update(uint32_t now_ms) {
   }
 
   FastLED.show();
+}
+
+void SceneManager::renderTest(uint32_t now_ms) {
+  const uint32_t delta = now_ms - last_update_ms_;
+  if (delta < current_scene_.speed) {
+    return;
+  }
+
+  clearLeds();
+  leds_[test_led_index_] = current_scene_.color;
+  test_led_index_ = (test_led_index_ + 1) % led_count_;
+  last_update_ms_ = now_ms;
 }
 
 void SceneManager::renderRainbow(uint32_t now_ms) {

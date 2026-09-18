@@ -8,6 +8,7 @@
 namespace carpanel {
 
 enum class SceneType : uint8_t {
+  Test,
   Rainbow,
   Chase,
   Pulse,
@@ -15,7 +16,7 @@ enum class SceneType : uint8_t {
 };
 
 struct SceneState {
-  SceneType type = SceneType::Rainbow;
+  SceneType type = SceneType::Test;
   uint8_t brightness = 128;
   uint8_t speed = 32;
   CRGB color = CRGB::Blue;
@@ -34,6 +35,7 @@ class SceneManager {
   const SceneState& currentScene() const { return current_scene_; }
 
  private:
+  void renderTest(uint32_t now_ms);
   void renderRainbow(uint32_t now_ms);
   void renderChase(uint32_t now_ms);
   void renderPulse(uint32_t now_ms);
@@ -44,6 +46,7 @@ class SceneManager {
   uint16_t led_count_ = 0;
   SceneState current_scene_;
   uint32_t last_update_ms_ = 0;
+  uint16_t test_led_index_ = 0;
   uint8_t chase_offset_ = 0;
   uint8_t pulse_phase_ = 0;
 };
