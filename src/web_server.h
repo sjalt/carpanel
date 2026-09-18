@@ -18,6 +18,7 @@ class WebServerController {
   void serveRoot();
   void handleSetScene();
   void handleSetBrightness();
+  void handleSetLayout();
   void handleJsonState();
   String buildHtml() const;
 

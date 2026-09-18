@@ -1,5 +1,7 @@
 #include "scene_manager.h"
 
+#include "config.h"
+
 namespace carpanel {
 
 SceneManager::SceneManager() {
@@ -7,6 +9,8 @@ SceneManager::SceneManager() {
   current_scene_.brightness = 128;
   current_scene_.speed = 32;
   current_scene_.color = CRGB::Blue;
+  layout_.rows = kDefaultPanelRows;
+  layout_.columns = kDefaultPanelColumns;
 }
 
 void SceneManager::begin(CRGB* leds, uint16_t led_count) {
@@ -19,6 +23,17 @@ void SceneManager::begin(CRGB* leds, uint16_t led_count) {
 void SceneManager::setBrightness(uint8_t brightness) {
   current_scene_.brightness = brightness;
   FastLED.setBrightness(brightness);
+}
+
+bool SceneManager::setLayout(uint16_t rows, uint16_t columns) {
+  if (rows == 0 || columns == 0 ||
+      static_cast<uint32_t>(rows) * columns != led_count_) {
+    return false;
+  }
+
+  layout_.rows = rows;
+  layout_.columns = columns;
+  return true;
 }
 
 void SceneManager::nextScene() {
@@ -111,7 +126,10 @@ void SceneManager::renderRainbow(uint32_t now_ms) {
   }
 
   for (uint16_t i = 0; i < led_count_; ++i) {
-    leds_[i] = CHSV((i * 256 / led_count_) + (now_ms / 20), 255, 255);
+    const uint16_t row = i / layout_.columns;
+    const uint16_t column = i % layout_.columns;
+    const uint16_t position = row * 256 / layout_.rows + column * 128 / layout_.columns;
+    leds_[i] = CHSV(position + (now_ms / 20), 255, 255);
   }
 
   last_update_ms_ = now_ms;
@@ -126,7 +144,8 @@ void SceneManager::renderChase(uint32_t now_ms) {
   clearLeds();
   const uint8_t offset = chase_offset_++;
   for (uint16_t i = 0; i < led_count_; ++i) {
-    if ((i + offset) % 8 == 0) {
+    const uint16_t column = i % layout_.columns;
+    if ((column + offset) % 8 == 0) {
       leds_[i] = current_scene_.color;
     }
   }

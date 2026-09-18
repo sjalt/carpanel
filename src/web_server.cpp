@@ -12,6 +12,7 @@ void WebServerController::begin() {
   server_.on("/", HTTP_GET, [this]() { serveRoot(); });
   server_.on("/scene", HTTP_POST, [this]() { handleSetScene(); });
   server_.on("/brightness", HTTP_POST, [this]() { handleSetBrightness(); });
+  server_.on("/layout", HTTP_POST, [this]() { handleSetLayout(); });
   server_.on("/api/state", HTTP_GET, [this]() { handleJsonState(); });
   server_.begin();
 }
@@ -71,12 +72,37 @@ void WebServerController::handleSetBrightness() {
   server_.send(200, "application/json", "{\"ok\":true}");
 }
 
+void WebServerController::handleSetLayout() {
+  if (!server_.hasArg("plain")) {
+    server_.send(400, "text/plain", "Missing JSON body");
+    return;
+  }
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, server_.arg("plain"));
+  if (err) {
+    server_.send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+
+  const uint16_t rows = doc["rows"] | 0;
+  const uint16_t columns = doc["columns"] | 0;
+  if (!scene_manager_.setLayout(rows, columns)) {
+    server_.send(400, "text/plain", "Rows multiplied by columns must equal the LED count");
+    return;
+  }
+
+  server_.send(200, "application/json", "{\"ok\":true}");
+}
+
 void WebServerController::handleJsonState() {
   const auto& scene = scene_manager_.currentScene();
 
   JsonDocument doc;
   doc["scene"] = static_cast<int>(scene.type);
   doc["brightness"] = scene.brightness;
+  doc["rows"] = scene_manager_.layout().rows;
+  doc["columns"] = scene_manager_.layout().columns;
 
   String output;
   serializeJson(doc, output);
@@ -115,6 +141,12 @@ String WebServerController::buildHtml() const {
       <label for="brightness">Brightness</label>
       <input id="brightness" type="range" min="0" max="255" step="1" value="128" />
 
+      <label for="rows">Panel rows (rows x columns = 144 LEDs)</label>
+      <input id="rows" type="number" min="1" value="12" />
+
+      <label for="columns">Panel columns</label>
+      <input id="columns" type="number" min="1" value="12" />
+
       <button id="applyBtn" type="button">Apply</button>
       <div id="status" class="status">Loading...</div>
     </div>
@@ -122,6 +154,8 @@ String WebServerController::buildHtml() const {
     <script>
       const sceneEl = document.getElementById('scene');
       const brightnessEl = document.getElementById('brightness');
+      const rowsEl = document.getElementById('rows');
+      const columnsEl = document.getElementById('columns');
       const statusEl = document.getElementById('status');
 
       async function fetchState() {
@@ -129,6 +163,8 @@ String WebServerController::buildHtml() const {
         const state = await response.json();
         sceneEl.value = ['test', 'rainbow', 'chase', 'pulse', 'solid'][state.scene] || 'test';
         brightnessEl.value = state.brightness || 128;
+        rowsEl.value = state.rows;
+        columnsEl.value = state.columns;
         statusEl.textContent = 'Connected';
       }
 
@@ -144,6 +180,15 @@ String WebServerController::buildHtml() const {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ brightness: Number(brightnessEl.value) })
         });
+        const layoutResponse = await fetch('/layout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: Number(rowsEl.value), columns: Number(columnsEl.value) })
+        });
+        if (!layoutResponse.ok) {
+          statusEl.textContent = await layoutResponse.text();
+          return;
+        }
         statusEl.textContent = 'Updated';
       });
 

@@ -22,17 +22,24 @@ struct SceneState {
   CRGB color = CRGB::Blue;
 };
 
+struct PanelLayout {
+  uint16_t rows = 12;
+  uint16_t columns = 12;
+};
+
 class SceneManager {
  public:
   SceneManager();
 
   void begin(CRGB* leds, uint16_t led_count);
   void setBrightness(uint8_t brightness);
+  bool setLayout(uint16_t rows, uint16_t columns);
   void nextScene();
   void setScene(SceneType scene);
   void update(uint32_t now_ms);
 
   const SceneState& currentScene() const { return current_scene_; }
+  const PanelLayout& layout() const { return layout_; }
 
  private:
   void renderTest(uint32_t now_ms);
@@ -45,6 +52,7 @@ class SceneManager {
   CRGB* leds_ = nullptr;
   uint16_t led_count_ = 0;
   SceneState current_scene_;
+  PanelLayout layout_;
   uint32_t last_update_ms_ = 0;
   uint16_t test_led_index_ = 0;
   uint8_t chase_offset_ = 0;
