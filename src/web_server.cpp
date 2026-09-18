@@ -207,8 +207,6 @@ String WebServerController::buildHtml() const {
       <label for="columns">Combined columns (calculated)</label>
       <input id="columns" type="number" value="32" disabled />
 
-      <label for="columns">Panel columns</label>
-      <input id="columns" type="number" min="1" value="32" />
 
       <label for="wiring">Connection order</label>
       <select id="wiring">
