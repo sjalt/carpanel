@@ -1,0 +1,142 @@
+#include "scene_manager.h"
+
+namespace carpanel {
+
+SceneManager::SceneManager() {
+  current_scene_.type = SceneType::Rainbow;
+  current_scene_.brightness = 128;
+  current_scene_.speed = 32;
+  current_scene_.color = CRGB::Blue;
+}
+
+void SceneManager::begin(CRGB* leds, uint16_t led_count) {
+  leds_ = leds;
+  led_count_ = led_count;
+  last_update_ms_ = millis();
+  clearLeds();
+}
+
+void SceneManager::setBrightness(uint8_t brightness) {
+  current_scene_.brightness = brightness;
+  FastLED.setBrightness(brightness);
+}
+
+void SceneManager::nextScene() {
+  switch (current_scene_.type) {
+    case SceneType::Rainbow:
+      setScene(SceneType::Chase);
+      break;
+    case SceneType::Chase:
+      setScene(SceneType::Pulse);
+      break;
+    case SceneType::Pulse:
+      setScene(SceneType::Solid);
+      break;
+    case SceneType::Solid:
+    default:
+      setScene(SceneType::Rainbow);
+      break;
+  }
+}
+
+void SceneManager::setScene(SceneType scene) {
+  current_scene_.type = scene;
+  switch (scene) {
+    case SceneType::Rainbow:
+      current_scene_.color = CRGB::Blue;
+      current_scene_.speed = 24;
+      break;
+    case SceneType::Chase:
+      current_scene_.color = CRGB::Green;
+      current_scene_.speed = 40;
+      break;
+    case SceneType::Pulse:
+      current_scene_.color = CRGB::Orange;
+      current_scene_.speed = 55;
+      break;
+    case SceneType::Solid:
+    default:
+      current_scene_.color = CRGB::Purple;
+      current_scene_.speed = 10;
+      break;
+  }
+}
+
+void SceneManager::update(uint32_t now_ms) {
+  switch (current_scene_.type) {
+    case SceneType::Rainbow:
+      renderRainbow(now_ms);
+      break;
+    case SceneType::Chase:
+      renderChase(now_ms);
+      break;
+    case SceneType::Pulse:
+      renderPulse(now_ms);
+      break;
+    case SceneType::Solid:
+    default:
+      renderSolid();
+      break;
+  }
+
+  FastLED.show();
+}
+
+void SceneManager::renderRainbow(uint32_t now_ms) {
+  const uint32_t delta = now_ms - last_update_ms_;
+  if (delta < 20U) {
+    return;
+  }
+
+  for (uint16_t i = 0; i < led_count_; ++i) {
+    leds_[i] = CHSV((i * 256 / led_count_) + (now_ms / 20), 255, 255);
+  }
+
+  last_update_ms_ = now_ms;
+}
+
+void SceneManager::renderChase(uint32_t now_ms) {
+  const uint32_t delta = now_ms - last_update_ms_;
+  if (delta < 40U) {
+    return;
+  }
+
+  clearLeds();
+  const uint8_t offset = chase_offset_++;
+  for (uint16_t i = 0; i < led_count_; ++i) {
+    if ((i + offset) % 8 == 0) {
+      leds_[i] = current_scene_.color;
+    }
+  }
+
+  last_update_ms_ = now_ms;
+}
+
+void SceneManager::renderPulse(uint32_t now_ms) {
+  const uint32_t delta = now_ms - last_update_ms_;
+  if (delta < 18U) {
+    return;
+  }
+
+  const uint8_t pulse_value = (sin8((now_ms / 10) & 0xFF) * 255) / 255;
+  for (uint16_t i = 0; i < led_count_; ++i) {
+    leds_[i] = current_scene_.color;
+    leds_[i].nscale8_video(pulse_value);
+  }
+
+  last_update_ms_ = now_ms;
+}
+
+void SceneManager::renderSolid() {
+  for (uint16_t i = 0; i < led_count_; ++i) {
+    leds_[i] = current_scene_.color;
+  }
+}
+
+void SceneManager::clearLeds() {
+  for (uint16_t i = 0; i < led_count_; ++i) {
+    leds_[i] = CRGB::Black;
+  }
+}
+
+}  // namespace carpanel
